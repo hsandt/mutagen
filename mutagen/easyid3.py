@@ -166,12 +166,13 @@ class EasyID3(DictMixin, Metadata):
         cls.RegisterKey(key, getter, setter, deleter)
 
     @classmethod
-    def RegisterCommentKey(cls, default_encoding=3, default_lang='\0\0\0', default_desc=''):
+    def RegisterCommentKey(cls, default_encoding=3, default_lang='XXX', default_desc=''):
         """Register a comment key, stored in a COMM frame.
 
-        By default, comments use a null language and empty description, for
-        compatibility with other tagging software.  Call this method with
-        other parameters to override the defaults.::
+        By default, comments use 'XXX' language and empty description, following mutagen default.
+        Tagging software like puddletag use the same, some like EasyTag use empty '\0\0\0' language
+        instead on tag creation, but can still read other languages.
+        Call this method with other parameters to override the defaults.::
 
             EasyID3.RegisterCommentKey(default_lang='eng')
         """
@@ -588,9 +589,7 @@ EasyID3.RegisterKey("website", website_get, website_set, website_delete)
 EasyID3.RegisterKey(
     "replaygain_*_gain", gain_get, gain_set, gain_delete, peakgain_list)
 EasyID3.RegisterKey("replaygain_*_peak", peak_get, peak_set, peak_delete)
-# For new comments, use default lang 'XXX' and default desc 'Comment' as used by puddletag and Rhythmbox
-# and keep default encoding 3 (UTF-8)
-EasyID3.RegisterCommentKey(default_lang='XXX',default_desc='Comment')
+EasyID3.RegisterCommentKey()
 EasyID3.RegisterUrlKey()
 
 # At various times, information for this came from
