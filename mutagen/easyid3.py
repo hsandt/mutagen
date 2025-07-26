@@ -19,6 +19,7 @@ from mutagen import Metadata
 from mutagen._util import DictMixin, dict_match, loadfile
 from mutagen.id3 import ID3, error, delete, ID3FileType
 
+import logging
 
 __all__ = ['EasyID3', 'Open', 'delete']
 
@@ -165,27 +166,52 @@ class EasyID3(DictMixin, Metadata):
         cls.RegisterKey(key, getter, setter, deleter)
 
     @classmethod
-    def RegisterCommentKey(cls, lang='\0\0\0', desc=''):
+    def RegisterCommentKey(cls, default_encoding=3, default_lang='\0\0\0', default_desc=''):
         """Register a comment key, stored in a COMM frame.
 
         By default, comments use a null language and empty description, for
         compatibility with other tagging software.  Call this method with
         other parameters to override the defaults.::
 
-            EasyID3.RegisterCOMMKey(lang='eng')
+            EasyID3.RegisterCommentKey(default_lang='eng')
         """
-        frameid = ':'.join(('COMM', desc, lang))
 
         def getter(id3, key):
-            frame = id3.get(frameid)
-            return None if frame is None else list(frame)
+            frames = _get_main_comment_frames(id3)
+            return frames if frames else None
 
         def setter(id3, key, value):
+            frames = _get_main_comment_frames(id3)
+
+            if frames:
+                # use first comment (hopefully the only one) as reference for COMM parameters
+                # HashKey will be the same and therefore `add` below will actually *replace* the existing comment
+
+                if len(frames) > 1:
+                    logging.warning(f"Found multiple main comments: {frames}, using the first one as reference")
+
+                frame = frames[0]
+                encoding=frame.encoding
+                lang=frame.lang
+                desc=frame.desc
+            else:
+                # no existing comment to use as reference, so just pick some default params to create a new comment
+                encoding=default_encoding
+                lang=default_lang
+                desc=default_desc
+
             id3.add(mutagen.id3.COMM(
-                encoding=3, lang=lang, desc=desc, text=value))
+                encoding=encoding, lang=lang, desc=desc, text=value))
 
         def deleter(id3, key):
             del id3[frameid]
+
+        def _get_main_comment_frames(id3):
+            frames = id3.getall('COMM')
+            # this filter is enough to exclude sub-comments like iTunes metadata which start with 'iTun'
+            # and only keep actual comments (normally 0 or 1)
+            frames = [frame for frame in frames if frame.desc in ['', 'Comment']]
+            return frames
 
         EasyID3.RegisterKey('comment', getter, setter, deleter)
 
@@ -562,7 +588,9 @@ EasyID3.RegisterKey("website", website_get, website_set, website_delete)
 EasyID3.RegisterKey(
     "replaygain_*_gain", gain_get, gain_set, gain_delete, peakgain_list)
 EasyID3.RegisterKey("replaygain_*_peak", peak_get, peak_set, peak_delete)
-EasyID3.RegisterCommentKey()
+# For new comments, use default lang 'XXX' and default desc 'Comment' as used by puddletag and Rhythmbox
+# and keep default encoding 3 (UTF-8)
+EasyID3.RegisterCommentKey(default_lang='XXX',default_desc='Comment')
 EasyID3.RegisterUrlKey()
 
 # At various times, information for this came from
