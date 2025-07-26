@@ -205,7 +205,10 @@ class EasyID3(DictMixin, Metadata):
                 encoding=encoding, lang=lang, desc=desc, text=value))
 
         def deleter(id3, key):
-            del id3[frameid]
+            frames = _get_main_comment_frames(id3)
+            for frame in frames:
+                frameid = ':'.join(('COMM', frame.desc, frame.lang))
+                del id3[frameid]
 
         def _get_main_comment_frames(id3):
             frames = id3.getall('COMM')
