@@ -172,7 +172,11 @@ class EasyID3(DictMixin, Metadata):
         By default, comments use 'XXX' language and empty description, following mutagen default.
         Tagging software like puddletag use the same, some like EasyTag use empty '\0\0\0' language
         instead on tag creation, but can still read other languages.
-        Call this method with other parameters to override the defaults.::
+        Call this method with other parameters to override the defaults.
+
+        Caution: setter will automatically delete extra comments after the first recognized one.
+        It is the client code's responsibility to first save any extra comment
+        and append them to the new first comment if they don't want to lose any data.::
 
             EasyID3.RegisterCommentKey(default_lang='eng')
         """
@@ -195,6 +199,13 @@ class EasyID3(DictMixin, Metadata):
                 encoding=frame.encoding
                 lang=frame.lang
                 desc=frame.desc
+
+                # also delete any extra comment (client code is responsible to backup or
+                # reinject all existing comments to avoid losing data)
+                for frame in frames:
+                    if frame.desc != desc or frame.lang != lang:
+                        frameid = ':'.join(('COMM', frame.desc, frame.lang))
+                        del id3[frameid]
             else:
                 # no existing comment to use as reference, so just pick some default params to create a new comment
                 encoding=default_encoding
@@ -206,6 +217,8 @@ class EasyID3(DictMixin, Metadata):
 
         def deleter(id3, key):
             frames = _get_main_comment_frames(id3)
+
+            # delete all matching comments
             for frame in frames:
                 frameid = ':'.join(('COMM', frame.desc, frame.lang))
                 del id3[frameid]
